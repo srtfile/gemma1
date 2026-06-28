@@ -1,4 +1,4 @@
-import re, json, base64, requests, random, sys
+import re, json, base64, requests, random, sys, os, datetime
 from urllib.parse import quote
 
 BASE = "https://gemma416okl.com"
@@ -26,6 +26,12 @@ def make_session(host, port):
     s.headers["User-Agent"] = UA
     return s
 
+def save_result(data):
+    os.makedirs("docs", exist_ok=True)
+    with open("docs/result.json", "w") as f:
+        json.dump(data, f, indent=2)
+    print("[+] Saved to docs/result.json")
+
 def get_streams(imdb_id="tt0800369"):
     referer = f"{BASE}/play/{imdb_id}"
     proxy_list = PROXIES.copy()
@@ -45,17 +51,15 @@ def get_streams(imdb_id="tt0800369"):
             print(f"    failed: {e}")
 
     if not html:
-        result = {"error": "All proxies failed", "imdb_id": imdb_id, "tracks": []}
-        with open("docs/result.json", "w") as f:
-            json.dump(result, f)
+        save_result({"error": "All proxies failed", "imdb_id": imdb_id, "tracks": [],
+                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z"})
         print("[-] All proxies failed.")
         sys.exit(1)
 
     m = re.search(r'let\s+p3\s*=\s*(\{.+?\});', html, re.DOTALL)
     if not m:
-        result = {"error": "Config block not found", "imdb_id": imdb_id, "tracks": []}
-        with open("docs/result.json", "w") as f:
-            json.dump(result, f)
+        save_result({"error": "Config block not found in page", "imdb_id": imdb_id, "tracks": [],
+                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z"})
         print("[-] Config block not found.")
         sys.exit(1)
 
@@ -83,9 +87,9 @@ def get_streams(imdb_id="tt0800369"):
     try:
         raw_tracks = json.loads(post(file_path))
     except Exception as e:
-        result = {"error": f"Track fetch failed: {e}", "imdb_id": imdb_id, "tracks": []}
-        with open("docs/result.json", "w") as f:
-            json.dump(result, f)
+        save_result({"error": f"Track fetch failed: {e}", "imdb_id": imdb_id, "tracks": [],
+                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z"})
+        print(f"[-] Track fetch failed: {e}")
         sys.exit(1)
 
     def flatten(obj):
@@ -113,18 +117,11 @@ def get_streams(imdb_id="tt0800369"):
             print(f"[{lang}] ERROR: {e}")
             output_tracks.append({"lang": lang, "error": str(e)})
 
-    import datetime
-    result = {
+    save_result({
         "imdb_id": imdb_id,
         "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
         "tracks": output_tracks
-    }
-
-    import os
-    os.makedirs("docs", exist_ok=True)
-    with open("docs/result.json", "w") as f:
-        json.dump(result, f, indent=2)
-    print("[+] Saved to docs/result.json")
+    })
 
 if __name__ == "__main__":
     imdb_id = sys.argv[1] if len(sys.argv) > 1 else "tt0800369"
