@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stream Resolver</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f0f; color: #e0e0e0; font-family: monospace; padding: 24px; }
+  h1 { color: #fff; margin-bottom: 6px; font-size: 1.4rem; }
+  .sub { color: #666; font-size: 0.85rem; margin-bottom: 24px; }
+  .meta { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; font-size: 0.9rem; }
+  .meta span { color: #aaa; }
+  .meta b { color: #7dd3fc; }
+  .track { background: #161616; border: 1px solid #2a2a2a; border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .track-header { background: #1e1e1e; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .track-header .lang { color: #a78bfa; font-weight: bold; font-size: 0.95rem; }
+  .copy-btn { background: #2a2a2a; border: 1px solid #3a3a3a; color: #ccc; padding: 4px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-family: monospace; }
+  .copy-btn:hover { background: #333; color: #fff; }
+  .playlist { padding: 14px 16px; white-space: pre-wrap; word-break: break-all; font-size: 0.8rem; color: #86efac; line-height: 1.6; max-height: 300px; overflow-y: auto; }
+  .error-box { padding: 14px 16px; color: #f87171; font-size: 0.85rem; }
+  .loading { color: #666; text-align: center; padding: 40px; }
+  .refresh-btn { background: #1d4ed8; border: none; color: #fff; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-family: monospace; font-size: 0.9rem; margin-bottom: 20px; }
+  .refresh-btn:hover { background: #2563eb; }
+  .badge { display: inline-block; background: #166534; color: #86efac; font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; margin-left: 10px; vertical-align: middle; }
+  .badge.err { background: #7f1d1d; color: #f87171; }
+</style>
+</head>
+<body>
+
+<h1>Stream Resolver</h1>
+<p class="sub">Results from last GitHub Actions run</p>
+
+<button class="refresh-btn" onclick="load()">↻ Refresh</button>
+
+<div id="root"><div class="loading">Loading result.json ...</div></div>
+
+<script>
+async function load() {
+  const root = document.getElementById("root");
+  root.innerHTML = '<div class="loading">Fetching...</div>';
+  try {
+    const r = await fetch("result.json?t=" + Date.now());
+    if (!r.ok) throw new Error("result.json not found (run the workflow first)");
+    const data = await r.json();
+
+    if (data.error) {
+      root.innerHTML = `<div class="meta" style="color:#f87171">Error: ${data.error}</div>`;
+      return;
+    }
+
+    let html = `<div class="meta">
+      <span>IMDB ID:</span> <b>${data.imdb_id}</b> &nbsp;|&nbsp;
+      <span>Tracks:</span> <b>${data.tracks.length}</b> &nbsp;|&nbsp;
+      <span>Updated:</span> <b>${new Date(data.timestamp).toLocaleString()}</b>
+    </div>`;
+
+    for (const t of data.tracks) {
+      const id = "pl_" + Math.random().toString(36).slice(2);
+      if (t.error) {
+        html += `<div class="track">
+          <div class="track-header">
+            <span class="lang">${t.lang} <span class="badge err">ERROR</span></span>
+          </div>
+          <div class="error-box">${t.error}</div>
+        </div>`;
+      } else {
+        const lines = t.playlist.split("\n").filter(l => l.startsWith("http"));
+        html += `<div class="track">
+          <div class="track-header">
+            <span class="lang">${t.lang} <span class="badge">${lines.length} URL${lines.length !== 1 ? "s" : ""}</span></span>
+            <button class="copy-btn" onclick="copy('${id}')">Copy</button>
+          </div>
+          <div class="playlist" id="${id}">${t.playlist}</div>
+        </div>`;
+      }
+    }
+
+    root.innerHTML = html;
+  } catch(e) {
+    root.innerHTML = `<div class="meta" style="color:#f87171">${e.message}</div>`;
+  }
+}
+
+function copy(id) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text).then(() => alert("Copied!"));
+}
+
+load();
+</script>
+</body>
+</html>
