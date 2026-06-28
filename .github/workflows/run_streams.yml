@@ -1,0 +1,28 @@
+name: Run Stream Resolver
+
+on:
+  workflow_dispatch:
+    inputs:
+      imdb_id:
+        description: 'IMDB ID (e.g. tt0800369)'
+        required: false
+        default: 'tt0800369'
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run stream resolver
+        run: python get_streams.py "${{ github.event.inputs.imdb_id }}"
